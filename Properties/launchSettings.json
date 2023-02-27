@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "appsvc_fnc_dev_scw_sensitivity_dotnet001": {
+      "commandName": "Project",
+      "commandLineArgs": "--port 7202",
+      "launchBrowser": false
+    }
+  }
+}
