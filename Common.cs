@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
+using Microsoft.SharePoint.News.DataModel;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Newtonsoft.Json;
@@ -12,7 +14,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 {
     internal class Common
     {
-        public static async Task<string> ApplyLabel(GraphServiceClient graphClient, string labelId, string groupId, ILogger log)
+        public static async Task<Boolean> ApplyLabel(GraphServiceClient graphClient, string labelId, string groupId, string itemId, string requestId, string displayName, ILogger log)
         {
             // Digital Vault - Vault Digitale Digital Vault                3d277510-cb23-44c1-a9c4-7680fcc237fb
             // PROTECTED B - PROTÉGÉ B        Protect B                    a1ab9d1a-185f-40cc-97d9-e1177019a70b
@@ -29,6 +31,9 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 }
             };
 
+            // force an exception
+            groupId = "causeException";
+
             try
             {
                 var users = await graphClient.Groups[groupId].Request().UpdateAsync(group);
@@ -38,12 +43,47 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 log.LogError($"Message: {e.Message}");
                 if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
                 log.LogError($"StackTrace: {e.StackTrace}");
+
+                string status = "Failed";
+
+                var listItem = new ListItem
+                {
+                    Fields = new FieldValueSet
+                    {
+                        AdditionalData = new Dictionary<string, object>()
+                        {
+                            { "Id", requestId },
+                            { "groupId", groupId },
+                            { "SpaceName", displayName },
+                            { "Status", status},
+                            { "FunctionApp", "Sensitivity" },
+                            { "Method", "ApplyLabel" },
+                            { "ErrorMessage", $"{e.Message}" }
+                        }
+                    }
+                };
+                await AddQueueMessage("email", JsonConvert.SerializeObject(listItem.Fields.AdditionalData), log);
+
+                listItem = new ListItem
+                {
+                    Fields = new FieldValueSet
+                    {
+                        AdditionalData = new Dictionary<string, object>()
+                        {
+                            {"Id", itemId},
+                            {"Status", status},
+                        }
+                    }
+                };
+                await AddQueueMessage("list", JsonConvert.SerializeObject(listItem.Fields.AdditionalData), log);
+
+                return false;
             }
 
-            return "true";
+            return true;
         }
 
-        public static async Task<IActionResult> AddToEmailQueue(string connectionString, string requestId, string groupId, string displayName, string requesterName, string requesterEmail, ILogger log)
+        public static async Task<IActionResult> AddToEmailQueue(string requestId, string groupId, string displayName, string requesterName, string requesterEmail, ILogger log)
         {
             log.LogInformation("AddToEmailQueue received a request.");
 
@@ -66,14 +106,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                     }
                 };
 
-                CloudStorageAccount storageAccount = CloudStorageAccount.Parse(connectionString);
-                CloudQueueClient queueClient = storageAccount.CreateCloudQueueClient();
-                CloudQueue queue = queueClient.GetQueueReference("email");
-                
-                string serializedMessage = JsonConvert.SerializeObject(listItem.Fields.AdditionalData); 
-
-                CloudQueueMessage message = new CloudQueueMessage(serializedMessage);
-                await queue.AddMessageAsync(message);
+                await AddQueueMessage("email", JsonConvert.SerializeObject(listItem.Fields.AdditionalData), log);
             }
             catch (Exception e)
             {
@@ -106,11 +139,28 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             return new OkResult();
         }
 
+        public static async Task AddQueueMessage(string queueName, string serializedMessage, ILogger log)
+        {
+            log.LogInformation("AddQueueMessage received a request.");
 
 
-       
+            log.LogInformation($"queueName: {queueName}");
+            log.LogInformation($"serializedMessage: {serializedMessage}");
 
 
 
+            IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
+
+            string connectionString = config["AzureWebJobsStorage"];
+
+            CloudStorageAccount storageAccount = CloudStorageAccount.Parse(connectionString);
+            CloudQueueClient queueClient = storageAccount.CreateCloudQueueClient();
+            CloudQueue queue = queueClient.GetQueueReference(queueName);
+
+            CloudQueueMessage message = new CloudQueueMessage(serializedMessage);
+            await queue.AddMessageAsync(message);
+
+            log.LogInformation("AddQueueMessage processed a request.");
+        }
     }
 }

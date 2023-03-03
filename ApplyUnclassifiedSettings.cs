@@ -9,7 +9,6 @@ using Newtonsoft.Json;
 using System.Collections.Generic;
 using Microsoft.SharePoint.Client;
 using PnP.Framework.Entities;
-using System.Diagnostics.Metrics;
 
 namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 {
@@ -28,7 +27,8 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             string labelId = config["unclassifiedLabelId"];
             string DisplayName = data?.DisplayName;
             string requestId = data?.Id;
-            string connectionString = config["AzureWebJobsStorage"];
+
+            string itemId = data?.itemId;
 
             string keyVaultUrl = config["keyVaultUrl"];
             string sharePointUrl = config["sharePointUrl"] + requestId;
@@ -41,16 +41,22 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
             ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);
             var graphClient = new GraphServiceClient(auth);
-            await Common.ApplyLabel(graphClient, labelId, groupId, log);
-            await SetUnclassified(graphClient, groupId, log);
-            await Common.RemoveOwner(graphClient, groupId, "e4b36075-bb6a-4acf-badb-076b0c3d8d90", log);
+            
+            //await Common.ApplyLabel(graphClient, labelId, groupId, itemId, requestId, DisplayName, log);
+            
+            var result = Common.ApplyLabel(graphClient, labelId, groupId, itemId, requestId, DisplayName, log);
 
-            var ctx = Auth.GetContextByCertificate(sharePointUrl, keyVaultUrl, certificateName, clientId, tenantId, log);
-            await AddSiteCollectionAdministrator(ctx, SCAGroupName, log);
+            if (result.Result == true)
+            {
+                await SetUnclassified(graphClient, groupId, log);
+                await Common.RemoveOwner(graphClient, groupId, "e4b36075-bb6a-4acf-badb-076b0c3d8d90", log);
 
-            await AddPermissionLevel(ctx, SupportGroupName, log);
+                var ctx = Auth.GetContextByCertificate(sharePointUrl, keyVaultUrl, certificateName, clientId, tenantId, log);
+                await AddSiteCollectionAdministrator(ctx, SCAGroupName, log);
 
-            await Common.AddToEmailQueue(connectionString, requestId, groupId, DisplayName, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
+                await AddPermissionLevel(ctx, SupportGroupName, log);
+                await Common.AddToEmailQueue(requestId, groupId, DisplayName, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
+            }
 
             log.LogInformation($"ApplyUnclassifiedSettings processed a request.");
         }
