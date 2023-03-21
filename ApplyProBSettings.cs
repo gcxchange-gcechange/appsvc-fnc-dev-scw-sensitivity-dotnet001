@@ -30,10 +30,14 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);
             var graphClient = new GraphServiceClient(auth);
 
-            await Common.ApplyLabel(graphClient, labelId, groupId, itemId, requestId, DisplayName, log);
-            await SetProB(graphClient, groupId, log);
-            await Common.RemoveOwner(graphClient, groupId, "e4b36075-bb6a-4acf-badb-076b0c3d8d90", log);
-            await Common.AddToEmailQueue(requestId, groupId, DisplayName, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
+            var result = Common.ApplyLabel(graphClient, labelId, groupId, itemId, requestId, DisplayName, log);
+
+            if (result.Result == true)
+            {
+                await SetProB(graphClient, groupId, log);
+                await Common.RemoveOwner(graphClient, groupId, "e4b36075-bb6a-4acf-badb-076b0c3d8d90", log);
+                await Common.AddToEmailQueue(requestId, groupId, DisplayName, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
+            }
 
             log.LogInformation($"ApplyProBSettings processed a request.");
         }

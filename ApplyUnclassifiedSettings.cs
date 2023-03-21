@@ -42,8 +42,6 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);
             var graphClient = new GraphServiceClient(auth);
             
-            //await Common.ApplyLabel(graphClient, labelId, groupId, itemId, requestId, DisplayName, log);
-            
             var result = Common.ApplyLabel(graphClient, labelId, groupId, itemId, requestId, DisplayName, log);
 
             if (result.Result == true)

@@ -31,9 +31,6 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 }
             };
 
-            // force an exception
-            groupId = "causeException";
-
             try
             {
                 var users = await graphClient.Groups[groupId].Request().UpdateAsync(group);
@@ -142,12 +139,8 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
         public static async Task AddQueueMessage(string queueName, string serializedMessage, ILogger log)
         {
             log.LogInformation("AddQueueMessage received a request.");
-
-
             log.LogInformation($"queueName: {queueName}");
             log.LogInformation($"serializedMessage: {serializedMessage}");
-
-
 
             IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
 
