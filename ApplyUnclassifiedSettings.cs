@@ -161,12 +161,6 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
         {
             var result = true;
 
-
-            
-
-
-
-
             try
             {
                 string permissionLevel = "Read";
@@ -197,15 +191,5 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
             return Task.FromResult(result);
         }
-
-
-
-
-
-
-
-
-
-
     }
 }
