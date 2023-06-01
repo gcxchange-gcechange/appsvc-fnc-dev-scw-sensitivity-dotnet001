@@ -9,6 +9,7 @@ using Newtonsoft.Json;
 using System.Collections.Generic;
 using Microsoft.SharePoint.Client;
 using PnP.Framework.Entities;
+using Azure.Core;
 
 namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 {
@@ -37,6 +38,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             string sharePointUrl = config["sharePointUrl"] + requestId;
             string supportGroupName = config["support_group_login_name"];
             string tenantId = config["tenantId"];
+            string tenantName = config["tenantName"];
 
             ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);
             var graphClient = new GraphServiceClient(auth);
@@ -47,13 +49,22 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             {
                 // Graph code
                 await SetUnclassified(graphClient, groupId, log);
-                await Common.RemoveOwner(graphClient, groupId, ownerId, log); // sv-caupdate@devgcx.ca
 
                 // SharePoint code
-                var ctx = Auth.GetContextByCertificate(sharePointUrl, keyVaultUrl, certificateName, clientId, tenantId, log);
-                await UpdateSiteCollectionAdministrator(ctx, SCAGroupName, groupId, log);   // dgcx_sca
+                //var ctx = Auth.GetContextByCertificate(sharePointUrl, keyVaultUrl, certificateName, clientId, tenantId, log);
+
+                ROPCConfidentialTokenCredential token = new ROPCConfidentialTokenCredential(log);
+                var scopes = new string[] { $"https://{tenantName}.sharepoint.com/.default" };
+                var authManager = new PnP.Framework.AuthenticationManager();
+                var accessToken = await token.GetTokenAsync(new TokenRequestContext(scopes), new System.Threading.CancellationToken());
+                var ctx = authManager.GetAccessTokenContext(sharePointUrl, accessToken.Token);
+
+                //await UpdateSiteCollectionAdministrator(sharePointUrl, tenantName, SCAGroupName, groupId, log);   // dgcx_sca
+                UpdateSiteCollectionAdministrator(ctx, SCAGroupName, groupId, log);   // dgcx_sca
                 await AddGroupToFullControl(ctx, supportGroupName, log); // dgcx_support
                 await AddGroupToReadOnly(ctx, readOnlyGroup, log); // dgcx_allusers, dgcx_assigned
+
+                await Common.RemoveOwner(graphClient, groupId, ownerId, log); // sv-caupdate@devgcx.ca
 
                 await Common.AddToEmailQueue(requestId, groupId, displayName, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
             }
@@ -82,11 +93,12 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             return new OkResult();
         }
 
-        public static Task<bool> UpdateSiteCollectionAdministrator(ClientContext ctx, string GroupLoginName, string groupId, ILogger log)
+        //public static async Task<bool> UpdateSiteCollectionAdministrator(string sharePointUrl, string tenantName, string GroupLoginName, string groupId, ILogger log) // ClientContext ctx, 
+        public static bool UpdateSiteCollectionAdministrator(ClientContext ctx, string GroupLoginName, string groupId, ILogger log) // ClientContext ctx, 
         {
             log.LogInformation("UpdateSiteCollectionAdministrator received a request.");
 
-            var result = true;
+            bool result = true;
 
             try
             {
@@ -95,14 +107,14 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 ctx.Load(ctx.Site.RootWeb);
                 ctx.ExecuteQuery();
 
-                // this prevents the Hub Visitor group from being added to site permissions
-                ctx.Site.CanSyncHubSitePermissions = false;
-
                 // add dgcx_support
                 List<UserEntity> admins = new List<UserEntity>();
                 UserEntity adminUserEntity = new UserEntity();
                 adminUserEntity.LoginName = GroupLoginName;
                 admins.Add(adminUserEntity);
+
+                // Message: This operation can only be performed on a site that is currently associated with a Hub Site.
+                // StackTrace:    at Microsoft.SharePoint.Client.ClientRequest.ProcessResponseStream(Stream responseStream)
                 ctx.Site.RootWeb.AddAdministrators(admins, true);
 
                 // remove the owner group
@@ -111,7 +123,6 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 ownerGroupEntity.LoginName = loginName;
                 ctx.Site.RootWeb.RemoveAdministrator(ownerGroupEntity);
             }
-
             catch (Exception e)
             {
                 log.LogError($"Message: {e.Message}");
@@ -122,7 +133,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
             log.LogInformation("UpdateSiteCollectionAdministrator processed a request.");
 
-            return Task.FromResult(result);
+            return result;
         }
 
         public static Task<bool> AddGroupToFullControl(ClientContext ctx, string GroupLoginName, ILogger log)
@@ -180,6 +191,13 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
                     ctx.Load(spGroup, x => x.Users);
                     ctx.ExecuteQuery();
+
+                    // this prevents the Hub Visitor group from being added to site permissions
+                    // 2022.05.30 - started getting this error so commenting out for now:
+                    // This operation can only be performed on a site that is currently associated with a Hub Site.
+                    //log.LogInformation("this prevents the Hub Visitor group from being added to site permissions");
+                    //ctx.Load(ctx.Site);
+                    //ctx.Site.CanSyncHubSitePermissions = false;
                 }
             }
             catch (Exception e)

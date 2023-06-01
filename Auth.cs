@@ -70,6 +70,8 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             _log = log;
             _tokenEndpoint = "https://login.microsoftonline.com/" + _tenantId + "/oauth2/v2.0/token";
 
+            log.LogInformation($"_username = {_username}");
+
             SecretClientOptions options = new SecretClientOptions()
             {
                 Retry =
