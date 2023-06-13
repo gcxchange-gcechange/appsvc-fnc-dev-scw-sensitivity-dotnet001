@@ -15,7 +15,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
     public class ApplyUnclassifiedSettings
     {
         [FunctionName("ApplyUnclassifiedSettings")]
-        public async Task RunAsync([QueueTrigger("unclassified", Connection = "AzureWebJobsStorage")]string myQueueItem, ILogger log, ExecutionContext functionContext)
+        public async Task RunAsync([QueueTrigger("unclassified", Connection = "AzureWebJobsStorage")] string myQueueItem, ILogger log, ExecutionContext functionContext)
         {
             log.LogInformation($"ApplyUnclassifiedSettings received a request: {myQueueItem}");
 
@@ -23,37 +23,39 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
             IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
 
-            string groupId = data?.groupId;
-            string labelId = config["unclassifiedLabelId"];
-            string DisplayName = data?.DisplayName;
-            string requestId = data?.Id;
-
-            string itemId = data?.itemId;
-
-            string keyVaultUrl = config["keyVaultUrl"];
-            string sharePointUrl = config["sharePointUrl"] + requestId;
-            string clientId = config["clientId"];
             string certificateName = config["certificateName"];
-            string tenantId = config["tenantId"];
-
+            string clientId = config["clientId"];
+            string displayName = data?.DisplayName;
+            string groupId = data?.groupId;
+            string itemId = data?.itemId;
+            string keyVaultUrl = config["keyVaultUrl"];
+            string labelId = config["unclassifiedLabelId"];
+            string ownerId = config["ownerId"];
+            string readOnlyGroup = config["readOnlyGroup"];
+            string requestId = data?.Id;
             string SCAGroupName = config["sca_login_name"];
-            string SupportGroupName = config["support_group_login_name"];
+            string sharePointUrl = config["sharePointUrl"] + requestId;
+            string supportGroupName = config["support_group_login_name"];
+            string tenantId = config["tenantId"];
 
             ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);
             var graphClient = new GraphServiceClient(auth);
-            
-            var result = Common.ApplyLabel(graphClient, labelId, groupId, itemId, requestId, DisplayName, log);
+
+            var result = Common.ApplyLabel(graphClient, labelId, groupId, itemId, requestId, displayName, log);
 
             if (result.Result == true)
             {
+                // Graph code
                 await SetUnclassified(graphClient, groupId, log);
-                await Common.RemoveOwner(graphClient, groupId, "e4b36075-bb6a-4acf-badb-076b0c3d8d90", log);
+                await Common.RemoveOwner(graphClient, groupId, ownerId, log); // sv-caupdate@devgcx.ca
 
+                // SharePoint code
                 var ctx = Auth.GetContextByCertificate(sharePointUrl, keyVaultUrl, certificateName, clientId, tenantId, log);
-                await AddSiteCollectionAdministrator(ctx, SCAGroupName, log);
+                await UpdateSiteCollectionAdministrator(ctx, SCAGroupName, groupId, log);   // dgcx_sca
+                await AddGroupToFullControl(ctx, supportGroupName, log); // dgcx_support
+                await AddGroupToReadOnly(ctx, readOnlyGroup, log); // dgcx_allusers, dgcx_assigned
 
-                await AddPermissionLevel(ctx, SupportGroupName, log);
-                await Common.AddToEmailQueue(requestId, groupId, DisplayName, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
+                await Common.AddToEmailQueue(requestId, groupId, displayName, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
             }
 
             log.LogInformation($"ApplyUnclassifiedSettings processed a request.");
@@ -62,10 +64,6 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
         private static async Task<IActionResult> SetUnclassified(GraphServiceClient graphClient, string groupId, ILogger log)
         {
             log.LogInformation("SetUnclassified received a request.");
-
-
-            // good to know:
-            // var user = ctx.Site.RootWeb.SiteUsers.GetByLoginName($"c:0o.c|federateddirectoryclaimprovider|{groupId}_o");
 
             try
             {
@@ -84,8 +82,10 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             return new OkResult();
         }
 
-        public static Task<bool> AddSiteCollectionAdministrator(ClientContext ctx, string GroupLoginName, ILogger log)
+        public static Task<bool> UpdateSiteCollectionAdministrator(ClientContext ctx, string GroupLoginName, string groupId, ILogger log)
         {
+            log.LogInformation("UpdateSiteCollectionAdministrator received a request.");
+
             var result = true;
 
             try
@@ -95,44 +95,37 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 ctx.Load(ctx.Site.RootWeb);
                 ctx.ExecuteQuery();
 
+                // this prevents the Hub Visitor group from being added to site permissions
+                ctx.Site.CanSyncHubSitePermissions = false;
 
-
-                //ctx.Site.RootWeb.AddUserToGroup(ctx.Site.RootWeb.AssociatedMemberGroup, "i:0#.f|tenant|gabriela.morenoramirez@devgcx.onmicrosoft.com");
-                //ctx.Site.RootWeb.AddUserToGroup(ctx.Site.RootWeb.AssociatedMemberGroup, "i:0#.f|tenant|vanmathy.raviraj@devgcx.onmicrosoft.com");
-
-                var mems = ctx.Site.RootWeb.GetMembers();
-                log.LogInformation("GetMembers()");
-                foreach (var member in mems)
-                {
-                    // member.LoginName: i:0#.f|membership|ilia.salem@devgcx.onmicrosoft.com
-                    // member.LoginName: i:0#.f|membership|gabriela.morenoramirez@devgcx.onmicrosoft.com
-                    // member.LoginName: i:0#.f|membership|vanmathy.raviraj@devgcx.onmicrosoft.com
-
-                    log.LogInformation($"member.LoginName: {member.LoginName}");
-
-                }
-
-                ////////////////////////////////////////////////////////////////////////////////////////////
-
+                // add dgcx_support
                 List<UserEntity> admins = new List<UserEntity>();
                 UserEntity adminUserEntity = new UserEntity();
-
                 adminUserEntity.LoginName = GroupLoginName;
                 admins.Add(adminUserEntity);
-
                 ctx.Site.RootWeb.AddAdministrators(admins, true);
+
+                // remove the owner group
+                string loginName = $"c:0o.c|federateddirectoryclaimprovider|{groupId}_o";
+                UserEntity ownerGroupEntity = new UserEntity();
+                ownerGroupEntity.LoginName = loginName;
+                ctx.Site.RootWeb.RemoveAdministrator(ownerGroupEntity);
             }
+
             catch (Exception e)
             {
                 log.LogError($"Message: {e.Message}");
                 if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
                 log.LogError($"StackTrace: {e.StackTrace}");
+                result = false;
             }
+
+            log.LogInformation("UpdateSiteCollectionAdministrator processed a request.");
 
             return Task.FromResult(result);
         }
 
-        public static Task<bool> AddPermissionLevel(ClientContext ctx, string GroupLoginName, ILogger log)
+        public static Task<bool> AddGroupToFullControl(ClientContext ctx, string GroupLoginName, ILogger log)
         {
             var result = true;
 
@@ -147,12 +140,47 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 spGroup.Users.AddUser(adGroup);
 
                 var writeDefinition = ctx.Web.RoleDefinitions.GetByName(permissionLevel);
-                var roleDefCollection = new RoleDefinitionBindingCollection(ctx);
-                roleDefCollection.Add(writeDefinition);
+                var roleDefCollection = new RoleDefinitionBindingCollection(ctx) { writeDefinition};
                 var newRoleAssignment = ctx.Web.RoleAssignments.Add(adGroup, roleDefCollection);
 
                 ctx.Load(spGroup, x => x.Users);
                 ctx.ExecuteQuery();
+            }
+            catch (Exception e)
+            {
+                log.LogError($"Message: {e.Message}");
+                if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
+                log.LogError($"StackTrace: {e.StackTrace}");
+                result = false;
+            }
+
+            return Task.FromResult(result);
+        }
+
+        public static Task<bool> AddGroupToReadOnly(ClientContext ctx, string groups, ILogger log)
+        {
+            var result = true;
+
+            try
+            {
+                string permissionLevel = "Read";
+
+                foreach (string group in groups.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries))
+                {
+
+                    var adGroup = ctx.Web.EnsureUser(group);
+                    ctx.Load(adGroup);
+
+                    var spGroup = ctx.Web.AssociatedMemberGroup;
+                    spGroup.Users.AddUser(adGroup);
+
+                    var writeDefinition = ctx.Web.RoleDefinitions.GetByName(permissionLevel);
+                    var roleDefCollection = new RoleDefinitionBindingCollection(ctx) { writeDefinition };
+                    var newRoleAssignment = ctx.Web.RoleAssignments.Add(adGroup, roleDefCollection);
+
+                    ctx.Load(spGroup, x => x.Users);
+                    ctx.ExecuteQuery();
+                }
             }
             catch (Exception e)
             {
