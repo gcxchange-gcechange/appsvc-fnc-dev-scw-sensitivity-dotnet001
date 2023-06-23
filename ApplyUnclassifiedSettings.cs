@@ -47,14 +47,14 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             {
                 // Graph code
                 //await SetUnclassified(graphClient, groupId, log);
-                await Common.RemoveOwner(graphClient, groupId, ownerId, log); // sv-caupdate@devgcx.ca
+                
 
                 // SharePoint code
                 var ctx = Auth.GetContextByCertificate(sharePointUrl, keyVaultUrl, certificateName, clientId, tenantId, log);
                 await UpdateSiteCollectionAdministrator(ctx, SCAGroupName, groupId, log);   // dgcx_sca
                 await AddGroupToFullControl(ctx, supportGroupName, log); // dgcx_support
                 await AddGroupToReadOnly(ctx, readOnlyGroup, log); // dgcx_allusers, dgcx_assigned
-
+                await Common.RemoveOwner(graphClient, groupId, ownerId, log); // sv-caupdate@devgcx.ca
                 await Common.AddToEmailQueue(requestId, groupId, displayName, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
             }
 
