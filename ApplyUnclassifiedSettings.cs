@@ -46,7 +46,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             if (result.Result == true)
             {
                 // Graph code
-                await SetUnclassified(graphClient, groupId, log);
+                //await SetUnclassified(graphClient, groupId, log);
                 await Common.RemoveOwner(graphClient, groupId, ownerId, log); // sv-caupdate@devgcx.ca
 
                 // SharePoint code
