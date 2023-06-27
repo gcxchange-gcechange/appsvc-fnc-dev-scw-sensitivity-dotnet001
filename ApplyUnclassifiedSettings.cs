@@ -33,7 +33,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             string labelId = config["unclassifiedLabelId"];
             string ownerId = config["ownerId"];
             string readOnlyGroup = config["readOnlyGroup"];
-            string requestId = data?.Id;
+            string requestId = "uat"+data?.Id;
             string SCAGroupName = config["sca_login_name"];
             string sharePointUrl = config["sharePointUrl"] + requestId;
             string supportGroupName = config["support_group_login_name"];
