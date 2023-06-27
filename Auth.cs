@@ -17,33 +17,33 @@ using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 {
-    internal class Auth
-    {
+    //internal class Auth
+    //{
 
-        internal static X509Certificate2 GetKeyVaultCertificateAsync(string keyVaultUrl, string name, ILogger log)
-        {
-            log.LogInformation("GetKeyVaultCertificateAsync received a request.");
+    //    internal static X509Certificate2 GetKeyVaultCertificateAsync(string keyVaultUrl, string name, ILogger log)
+    //    {
+    //        log.LogInformation("GetKeyVaultCertificateAsync received a request.");
 
-            var client = new SecretClient(new Uri(keyVaultUrl), new DefaultAzureCredential());
-            var secret = client.GetSecret(name).Value;
+    //        var client = new SecretClient(new Uri(keyVaultUrl), new DefaultAzureCredential());
+    //        var secret = client.GetSecret(name).Value;
 
-            X509Certificate2 certificate = new X509Certificate2(Convert.FromBase64String(secret.Value), string.Empty, X509KeyStorageFlags.MachineKeySet);
+    //        X509Certificate2 certificate = new X509Certificate2(Convert.FromBase64String(secret.Value), string.Empty, X509KeyStorageFlags.MachineKeySet);
 
-            log.LogInformation("GetKeyVaultCertificateAsync processed a request.");
+    //        log.LogInformation("GetKeyVaultCertificateAsync processed a request.");
 
-            return certificate;
-        }
+    //        return certificate;
+    //    }
 
-        internal static ClientContext GetContextByCertificate(string siteUrl, string keyVaultUrl,string certificateName, string clientId, string tenantId, ILogger log)
-        {
-            X509Certificate2 mycert = Auth.GetKeyVaultCertificateAsync(keyVaultUrl, certificateName, log);
-            var ctx = new AuthenticationManager(clientId, mycert, tenantId).GetContext(siteUrl);
+    //    internal static ClientContext GetContextByCertificate(string siteUrl, string keyVaultUrl,string certificateName, string clientId, string tenantId, ILogger log)
+    //    {
+    //        X509Certificate2 mycert = Auth.GetKeyVaultCertificateAsync(keyVaultUrl, certificateName, log);
+    //        var ctx = new AuthenticationManager(clientId, mycert, tenantId).GetContext(siteUrl);
 
-            log.LogInformation($"Created client connection for {siteUrl}");
+    //        log.LogInformation($"Created client connection for {siteUrl}");
 
-            return ctx;
-        }
-    }
+    //        return ctx;
+    //    }
+    //}
 
     public class ROPCConfidentialTokenCredential : Azure.Core.TokenCredential
     {
