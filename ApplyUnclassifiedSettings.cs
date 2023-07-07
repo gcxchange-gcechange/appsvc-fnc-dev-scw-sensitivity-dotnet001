@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -24,12 +23,9 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
             IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
 
-            string certificateName = config["certificateName"];
-            string clientId = config["clientId"];
             string displayName = data?.DisplayName;
             string groupId = data?.groupId;
             string itemId = data?.itemId;
-            string keyVaultUrl = config["keyVaultUrl"];
             string labelId = config["unclassifiedLabelId"];
             string ownerId = config["ownerId"];
             string readOnlyGroup = config["readOnlyGroup"];
@@ -37,7 +33,6 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             string SCAGroupName = config["sca_login_name"];
             string sharePointUrl = config["sharePointUrl"] + requestId;
             string supportGroupName = config["support_group_login_name"];
-            string tenantId = config["tenantId"];
             string tenantName = config["tenantName"];
 
             ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);
@@ -47,20 +42,15 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
             if (result.Result == true)
             {
-                // Graph code
-                await SetUnclassified(graphClient, groupId, log);
+                // do not call method to set Visibility = Public
+                //await SetUnclassified(graphClient, groupId, log);
 
-                // SharePoint code
-                //var ctx = Auth.GetContextByCertificate(sharePointUrl, keyVaultUrl, certificateName, clientId, tenantId, log);
-
-                ROPCConfidentialTokenCredential token = new ROPCConfidentialTokenCredential(log);
                 var scopes = new string[] { $"https://{tenantName}.sharepoint.com/.default" };
                 var authManager = new PnP.Framework.AuthenticationManager();
-                var accessToken = await token.GetTokenAsync(new TokenRequestContext(scopes), new System.Threading.CancellationToken());
+                var accessToken = await auth.GetTokenAsync(new TokenRequestContext(scopes), new System.Threading.CancellationToken());
                 var ctx = authManager.GetAccessTokenContext(sharePointUrl, accessToken.Token);
 
-                //await UpdateSiteCollectionAdministrator(sharePointUrl, tenantName, SCAGroupName, groupId, log);   // dgcx_sca
-                UpdateSiteCollectionAdministrator(ctx, SCAGroupName, groupId, log);   // dgcx_sca
+                await UpdateSiteCollectionAdministrator(ctx, SCAGroupName, groupId, log);   // dgcx_sca
                 await AddGroupToFullControl(ctx, supportGroupName, log); // dgcx_support
                 await AddGroupToReadOnly(ctx, readOnlyGroup, log); // dgcx_allusers, dgcx_assigned
 
@@ -72,29 +62,28 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             log.LogInformation($"ApplyUnclassifiedSettings processed a request.");
         }
 
-        private static async Task<IActionResult> SetUnclassified(GraphServiceClient graphClient, string groupId, ILogger log)
-        {
-            log.LogInformation("SetUnclassified received a request.");
+        //private static async Task<IActionResult> SetUnclassified(GraphServiceClient graphClient, string groupId, ILogger log)
+        //{
+        //    log.LogInformation("SetUnclassified received a request.");
 
-            try
-            {
-                var group = new Microsoft.Graph.Group { Visibility = "Public" };
-                await graphClient.Groups[groupId].Request().UpdateAsync(group);
-            }
-            catch (Exception e)
-            {
-                log.LogError($"Message: {e.Message}");
-                if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
-                log.LogError($"StackTrace: {e.StackTrace}");
-            }
+        //    try
+        //    {
+        //        var group = new Microsoft.Graph.Group { Visibility = "Public" };
+        //        await graphClient.Groups[groupId].Request().UpdateAsync(group);
+        //    }
+        //    catch (Exception e)
+        //    {
+        //        log.LogError($"Message: {e.Message}");
+        //        if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
+        //        log.LogError($"StackTrace: {e.StackTrace}");
+        //    }
 
-            log.LogInformation("SetUnclassified processed a request.");
+        //    log.LogInformation("SetUnclassified processed a request.");
 
-            return new OkResult();
-        }
+        //    return new OkResult();
+        //}
 
-        //public static async Task<bool> UpdateSiteCollectionAdministrator(string sharePointUrl, string tenantName, string GroupLoginName, string groupId, ILogger log) // ClientContext ctx, 
-        public static bool UpdateSiteCollectionAdministrator(ClientContext ctx, string GroupLoginName, string groupId, ILogger log) // ClientContext ctx, 
+        public static Task<bool> UpdateSiteCollectionAdministrator(ClientContext ctx, string GroupLoginName, string groupId, ILogger log) // ClientContext ctx, 
         {
             log.LogInformation("UpdateSiteCollectionAdministrator received a request.");
 
@@ -119,9 +108,11 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
                 // remove the owner group
                 string loginName = $"c:0o.c|federateddirectoryclaimprovider|{groupId}_o";
+                log.LogInformation($"Remove loginName = {loginName}");
                 UserEntity ownerGroupEntity = new UserEntity();
                 ownerGroupEntity.LoginName = loginName;
                 ctx.Site.RootWeb.RemoveAdministrator(ownerGroupEntity);
+                log.LogInformation($"Done!");
             }
             catch (Exception e)
             {
@@ -133,7 +124,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
             log.LogInformation("UpdateSiteCollectionAdministrator processed a request.");
 
-            return result;
+            return Task.FromResult(result);
         }
 
         public static Task<bool> AddGroupToFullControl(ClientContext ctx, string GroupLoginName, ILogger log)
