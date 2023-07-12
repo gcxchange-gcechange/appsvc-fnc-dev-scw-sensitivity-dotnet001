@@ -96,14 +96,11 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 ctx.Load(ctx.Site.RootWeb);
                 ctx.ExecuteQuery();
 
-                // add dgcx_support
+                // add dgcx_sca as Administrator
                 List<UserEntity> admins = new List<UserEntity>();
                 UserEntity adminUserEntity = new UserEntity();
                 adminUserEntity.LoginName = GroupLoginName;
                 admins.Add(adminUserEntity);
-
-                // Message: This operation can only be performed on a site that is currently associated with a Hub Site.
-                // StackTrace:    at Microsoft.SharePoint.Client.ClientRequest.ProcessResponseStream(Stream responseStream)
                 ctx.Site.RootWeb.AddAdministrators(admins, true);
 
                 // remove the owner group
@@ -184,11 +181,8 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                     ctx.ExecuteQuery();
 
                     // this prevents the Hub Visitor group from being added to site permissions
-                    // 2022.05.30 - started getting this error so commenting out for now:
-                    // This operation can only be performed on a site that is currently associated with a Hub Site.
-                    //log.LogInformation("this prevents the Hub Visitor group from being added to site permissions");
-                    //ctx.Load(ctx.Site);
-                    //ctx.Site.CanSyncHubSitePermissions = false;
+                    ctx.Load(ctx.Site);
+                    ctx.Site.CanSyncHubSitePermissions = false;
                 }
             }
             catch (Exception e)
