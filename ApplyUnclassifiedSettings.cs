@@ -23,7 +23,6 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
             IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
 
-            string displayName = data?.DisplayName;
             string groupId = data?.groupId;
             string itemId = data?.itemId;
             string labelId = config["unclassifiedLabelId"];
@@ -32,13 +31,15 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             string requestId = data?.Id;
             string SCAGroupName = config["sca_login_name"];
             string sharePointUrl = config["sharePointUrl"] + requestId;
+            string spaceNameEn = data?.SpaceName;
+            string spaceNameFr = data?.SpaceNameFR;
             string supportGroupName = config["support_group_login_name"];
             string tenantName = config["tenantName"];
 
             ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);
             var graphClient = new GraphServiceClient(auth);
 
-            var result = Common.ApplyLabel(graphClient, labelId, groupId, itemId, requestId, displayName, log);
+            var result = Common.ApplyLabel(graphClient, labelId, groupId, itemId, requestId, spaceNameEn, spaceNameFr, log);
 
             if (result.Result == true)
             {
@@ -56,7 +57,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
                 await Common.RemoveOwner(graphClient, groupId, ownerId, log); // sv-caupdate@devgcx.ca
 
-                await Common.AddToEmailQueue(requestId, groupId, displayName, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
+                await Common.AddToEmailQueue(requestId, groupId, spaceNameEn, spaceNameFr, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
             }
 
             log.LogInformation($"ApplyUnclassifiedSettings processed a request.");
