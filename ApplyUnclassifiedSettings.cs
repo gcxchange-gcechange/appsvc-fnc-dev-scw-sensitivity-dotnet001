@@ -101,7 +101,6 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 List<UserEntity> admins = new List<UserEntity>();
                 UserEntity adminUserEntity = new UserEntity();
                 adminUserEntity.LoginName = GroupLoginName;
-                admins.Add(adminUserEntity);
                 ctx.Site.RootWeb.AddAdministrators(admins, true);
 
                 // remove the owner group
@@ -137,7 +136,6 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 ctx.Load(adGroup);
 
                 var spGroup = ctx.Web.AssociatedMemberGroup;
-                spGroup.Users.AddUser(adGroup);
 
                 var writeDefinition = ctx.Web.RoleDefinitions.GetByName(permissionLevel);
                 var roleDefCollection = new RoleDefinitionBindingCollection(ctx) { writeDefinition};
@@ -172,7 +170,6 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                     ctx.Load(adGroup);
 
                     var spGroup = ctx.Web.AssociatedMemberGroup;
-                    spGroup.Users.AddUser(adGroup);
 
                     var writeDefinition = ctx.Web.RoleDefinitions.GetByName(permissionLevel);
                     var roleDefCollection = new RoleDefinitionBindingCollection(ctx) { writeDefinition };
