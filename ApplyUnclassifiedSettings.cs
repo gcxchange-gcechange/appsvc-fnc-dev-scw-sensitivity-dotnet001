@@ -95,6 +95,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 ctx.Load(ctx.Web);
                 ctx.Load(ctx.Site);
                 ctx.Load(ctx.Site.RootWeb);
+                ctx.Load(ctx.Web.AssociatedOwnerGroup.Users);
                 ctx.ExecuteQuery();
 
                 // add dgcx_sca as Administrator
@@ -103,6 +104,9 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 adminUserEntity.LoginName = GroupLoginName;
                 admins.Add(adminUserEntity);
                 ctx.Site.RootWeb.AddAdministrators(admins, true);
+
+                // remove dgcx_sca from the owner group
+                ctx.Web.AssociatedOwnerGroup.Users.RemoveByLoginName(GroupLoginName);
 
                 // remove the owner group
                 string loginName = $"c:0o.c|federateddirectoryclaimprovider|{groupId}_o";
@@ -137,12 +141,10 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 ctx.Load(adGroup);
 
                 var spGroup = ctx.Web.AssociatedMemberGroup;
-                spGroup.Users.AddUser(adGroup);
 
                 var writeDefinition = ctx.Web.RoleDefinitions.GetByName(permissionLevel);
                 var roleDefCollection = new RoleDefinitionBindingCollection(ctx) { writeDefinition};
                 var newRoleAssignment = ctx.Web.RoleAssignments.Add(adGroup, roleDefCollection);
-
                 ctx.Load(spGroup, x => x.Users);
                 ctx.ExecuteQuery();
             }
@@ -172,7 +174,6 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                     ctx.Load(adGroup);
 
                     var spGroup = ctx.Web.AssociatedMemberGroup;
-                    spGroup.Users.AddUser(adGroup);
 
                     var writeDefinition = ctx.Web.RoleDefinitions.GetByName(permissionLevel);
                     var roleDefCollection = new RoleDefinitionBindingCollection(ctx) { writeDefinition };
