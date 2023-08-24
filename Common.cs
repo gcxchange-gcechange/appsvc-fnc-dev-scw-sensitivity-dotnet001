@@ -141,8 +141,6 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
         public static async Task AddQueueMessage(string queueName, string serializedMessage, ILogger log)
         {
             log.LogInformation("AddQueueMessage received a request.");
-            log.LogInformation($"queueName: {queueName}");
-            log.LogInformation($"serializedMessage: {serializedMessage}");
 
             IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
 
@@ -156,6 +154,34 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             await queue.AddMessageAsync(message);
 
             log.LogInformation("AddQueueMessage processed a request.");
+        }
+
+        public static async Task<IActionResult> SetStatusComplete(GraphServiceClient graphClient, string siteId, string listId, string itemId, ILogger log)
+        {
+            log.LogInformation("SetStatusComplete received a request.");
+
+            try
+            {
+                var fieldValueSet = new FieldValueSet
+                {
+                    AdditionalData = new Dictionary<string, object>()
+                    {
+                        {"Status", "Complete"}
+                    }
+                };
+
+                await graphClient.Sites[siteId].Lists[listId].Items[itemId].Fields.Request().UpdateAsync(fieldValueSet);
+            }
+            catch (Exception e)
+            {
+                log.LogError($"Message: {e.Message}");
+                if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
+                log.LogError($"StackTrace: {e.StackTrace}");
+            }
+
+            log.LogInformation("SetStatusComplete processed a request.");
+
+            return new OkResult();
         }
     }
 }

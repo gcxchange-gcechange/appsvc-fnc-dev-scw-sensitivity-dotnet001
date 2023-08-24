@@ -26,11 +26,13 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             string groupId = data?.groupId;
             string itemId = data?.itemId;
             string labelId = config["unclassifiedLabelId"];
+            string listId = config["listId"];
             string ownerId = config["ownerId"];
             string readOnlyGroup = config["readOnlyGroup"];
             string requestId = data?.Id;
             string SCAGroupName = config["sca_login_name"];
             string sharePointUrl = config["sharePointUrl"] + requestId;
+            string siteId = config["siteId"];
             string spaceNameEn = data?.SpaceName;
             string spaceNameFr = data?.SpaceNameFR;
             string supportGroupName = config["support_group_login_name"];
@@ -56,6 +58,22 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 await AddGroupToReadOnly(ctx, readOnlyGroup, log); // dgcx_allusers, dgcx_assigned
 
                 await Common.RemoveOwner(graphClient, groupId, ownerId, log); // sv-caupdate@devgcx.ca
+                
+                
+                
+                
+                // need to add a condition so that this is called only when site creation is a success
+                await Common.SetStatusComplete(graphClient, siteId, listId, itemId, log);
+
+
+
+
+
+
+
+
+
+
 
                 await Common.AddToEmailQueue(requestId, groupId, spaceNameEn, spaceNameFr, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
             }
