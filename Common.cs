@@ -119,9 +119,11 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             return new OkResult();
         }
 
-        public static async Task<IActionResult> RemoveOwner(GraphServiceClient graphClient, string groupId, string userId, ILogger log)
+        public static async Task<bool> RemoveOwner(GraphServiceClient graphClient, string groupId, string userId, ILogger log)
         {
             log.LogInformation("RemoveOwner received a request.");
+
+            bool result = true;
 
             try
             {
@@ -132,10 +134,12 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 log.LogError($"Message: {e.Message}");
                 if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
                 log.LogError($"StackTrace: {e.StackTrace}");
+                result = false;
             }
 
             log.LogInformation("RemoveOwner processed a request.");
-            return new OkResult();
+            
+            return result;
         }
 
         public static async Task AddQueueMessage(string queueName, string serializedMessage, ILogger log)
