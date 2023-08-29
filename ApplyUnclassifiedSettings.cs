@@ -26,19 +26,15 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             string groupId = data?.groupId;
             string itemId = data?.itemId;
             string labelId = config["unclassifiedLabelId"];
-            string listId = config["listId"];
             string ownerId = config["ownerId"]; // sv-caupdate@devgcx.ca
             string readOnlyGroup = config["readOnlyGroup"]; // dgcx_allusers, dgcx_assigned
             string requestId = data?.Id;
             string SCAGroupName = config["sca_login_name"]; // dgcx_sca
             string sharePointUrl = config["sharePointUrl"] + requestId;
-            string siteId = config["siteId"];
             string spaceNameEn = data?.SpaceName;
             string spaceNameFr = data?.SpaceNameFR;
             string supportGroupName = config["support_group_login_name"];   // dgcx_support
             string tenantName = config["tenantName"];
-
-            bool success = true;
 
             ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);
             var graphClient = new GraphServiceClient(auth);
@@ -60,10 +56,10 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 bool result3 = await AddGroupToReadOnly(ctx, readOnlyGroup, log);
                 bool result4 = await Common.RemoveOwner(graphClient, groupId, ownerId, log);
 
-                success = result1 && result2 && result3 && result4;
+                bool success = result1 && result2 && result3 && result4;
 
                 if (success) {
-                    await Common.SetStatusComplete(graphClient, siteId, listId, itemId, log);
+                    await Common.AddToStatusQueue(itemId, log);
                     await Common.AddToEmailQueue(requestId, groupId, spaceNameEn, spaceNameFr, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
                 }
             }

@@ -160,21 +160,25 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             log.LogInformation("AddQueueMessage processed a request.");
         }
 
-        public static async Task<IActionResult> SetStatusComplete(GraphServiceClient graphClient, string siteId, string listId, string itemId, ILogger log)
+        public static async Task<IActionResult> AddToStatusQueue(string itemId, ILogger log)
         {
-            log.LogInformation("SetStatusComplete received a request.");
+            log.LogInformation("AddToStatusQueue received a request.");
 
             try
             {
-                var fieldValueSet = new FieldValueSet
+                var listItem = new ListItem
                 {
-                    AdditionalData = new Dictionary<string, object>()
+                    Fields = new FieldValueSet
                     {
-                        {"Status", "Complete"}
+                        AdditionalData = new Dictionary<string, object>()
+                        {
+                            { "Id", itemId },
+                            { "Status", "Complete" },
+                        }
                     }
                 };
 
-                await graphClient.Sites[siteId].Lists[listId].Items[itemId].Fields.Request().UpdateAsync(fieldValueSet);
+                await AddQueueMessage("status", JsonConvert.SerializeObject(listItem.Fields.AdditionalData), log);
             }
             catch (Exception e)
             {
@@ -183,7 +187,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 log.LogError($"StackTrace: {e.StackTrace}");
             }
 
-            log.LogInformation("SetStatusComplete processed a request.");
+            log.LogInformation("AddToStatusQueue processed a request.");
 
             return new OkResult();
         }
