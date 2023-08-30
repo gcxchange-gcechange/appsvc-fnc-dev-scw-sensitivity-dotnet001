@@ -119,9 +119,11 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             return new OkResult();
         }
 
-        public static async Task<IActionResult> RemoveOwner(GraphServiceClient graphClient, string groupId, string userId, ILogger log)
+        public static async Task<bool> RemoveOwner(GraphServiceClient graphClient, string groupId, string userId, ILogger log)
         {
             log.LogInformation("RemoveOwner received a request.");
+
+            bool result = true;
 
             try
             {
@@ -132,17 +134,17 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 log.LogError($"Message: {e.Message}");
                 if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
                 log.LogError($"StackTrace: {e.StackTrace}");
+                result = false;
             }
 
             log.LogInformation("RemoveOwner processed a request.");
-            return new OkResult();
+            
+            return result;
         }
 
         public static async Task AddQueueMessage(string queueName, string serializedMessage, ILogger log)
         {
             log.LogInformation("AddQueueMessage received a request.");
-            log.LogInformation($"queueName: {queueName}");
-            log.LogInformation($"serializedMessage: {serializedMessage}");
 
             IConfiguration config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).AddEnvironmentVariables().Build();
 
@@ -156,6 +158,38 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             await queue.AddMessageAsync(message);
 
             log.LogInformation("AddQueueMessage processed a request.");
+        }
+
+        public static async Task<IActionResult> AddToStatusQueue(string itemId, ILogger log)
+        {
+            log.LogInformation("AddToStatusQueue received a request.");
+
+            try
+            {
+                var listItem = new ListItem
+                {
+                    Fields = new FieldValueSet
+                    {
+                        AdditionalData = new Dictionary<string, object>()
+                        {
+                            { "Id", itemId },
+                            { "Status", "Complete" },
+                        }
+                    }
+                };
+
+                await AddQueueMessage("status", JsonConvert.SerializeObject(listItem.Fields.AdditionalData), log);
+            }
+            catch (Exception e)
+            {
+                log.LogError($"Message: {e.Message}");
+                if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
+                log.LogError($"StackTrace: {e.StackTrace}");
+            }
+
+            log.LogInformation("AddToStatusQueue processed a request.");
+
+            return new OkResult();
         }
     }
 }

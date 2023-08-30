@@ -26,14 +26,14 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             string groupId = data?.groupId;
             string itemId = data?.itemId;
             string labelId = config["unclassifiedLabelId"];
-            string ownerId = config["ownerId"];
-            string readOnlyGroup = config["readOnlyGroup"];
+            string ownerId = config["ownerId"]; // sv-caupdate@devgcx.ca
+            string readOnlyGroup = config["readOnlyGroup"]; // dgcx_allusers, dgcx_assigned
             string requestId = data?.Id;
-            string SCAGroupName = config["sca_login_name"];
+            string SCAGroupName = config["sca_login_name"]; // dgcx_sca
             string sharePointUrl = config["sharePointUrl"] + requestId;
             string spaceNameEn = data?.SpaceName;
             string spaceNameFr = data?.SpaceNameFR;
-            string supportGroupName = config["support_group_login_name"];
+            string supportGroupName = config["support_group_login_name"];   // dgcx_support
             string tenantName = config["tenantName"];
 
             ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);
@@ -51,13 +51,17 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 var accessToken = await auth.GetTokenAsync(new TokenRequestContext(scopes), new System.Threading.CancellationToken());
                 var ctx = authManager.GetAccessTokenContext(sharePointUrl, accessToken.Token);
 
-                await UpdateSiteCollectionAdministrator(ctx, SCAGroupName, groupId, log);   // dgcx_sca
-                await AddGroupToFullControl(ctx, supportGroupName, log); // dgcx_support
-                await AddGroupToReadOnly(ctx, readOnlyGroup, log); // dgcx_allusers, dgcx_assigned
+                bool result1 = await UpdateSiteCollectionAdministrator(ctx, SCAGroupName, groupId, log);
+                bool result2 = await AddGroupToFullControl(ctx, supportGroupName, log);
+                bool result3 = await AddGroupToReadOnly(ctx, readOnlyGroup, log);
+                bool result4 = await Common.RemoveOwner(graphClient, groupId, ownerId, log);
 
-                await Common.RemoveOwner(graphClient, groupId, ownerId, log); // sv-caupdate@devgcx.ca
+                bool success = result1 && result2 && result3 && result4;
 
-                await Common.AddToEmailQueue(requestId, groupId, spaceNameEn, spaceNameFr, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
+                if (success) {
+                    await Common.AddToStatusQueue(itemId, log);
+                    await Common.AddToEmailQueue(requestId, groupId, spaceNameEn, spaceNameFr, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
+                }
             }
 
             log.LogInformation($"ApplyUnclassifiedSettings processed a request.");
@@ -192,6 +196,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 log.LogError($"Message: {e.Message}");
                 if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
                 log.LogError($"StackTrace: {e.StackTrace}");
+                result = false;
             }
 
             return Task.FromResult(result);
