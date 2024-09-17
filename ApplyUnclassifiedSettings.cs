@@ -165,15 +165,20 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
         public static Task<bool> AddGroupToReadOnly(ClientContext ctx, string groups, ILogger log)
         {
+            string permissionLevel = "Read";
             var result = true;
 
             try
             {
-                string permissionLevel = "Read";
+                // this prevents the Hub Visitor group from being added to site permissions
+                ctx.Load(ctx.Site);
+                ctx.Site.CanSyncHubSitePermissions = false;
+
+                // break inheritance on the default document library to prevent access to read-only
+                ctx.Web.DefaultDocumentLibrary().BreakRoleInheritance(true, true);
 
                 foreach (string group in groups.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries))
                 {
-
                     var adGroup = ctx.Web.EnsureUser(group);
                     ctx.Load(adGroup);
 
@@ -185,10 +190,6 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
                     ctx.Load(spGroup, x => x.Users);
                     ctx.ExecuteQuery();
-
-                    // this prevents the Hub Visitor group from being added to site permissions
-                    ctx.Load(ctx.Site);
-                    ctx.Site.CanSyncHubSitePermissions = false;
                 }
             }
             catch (Exception e)
