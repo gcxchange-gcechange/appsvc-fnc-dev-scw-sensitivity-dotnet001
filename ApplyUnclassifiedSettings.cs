@@ -51,7 +51,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 var accessToken = await auth.GetTokenAsync(new TokenRequestContext(scopes), new System.Threading.CancellationToken());
                 var ctx = authManager.GetAccessTokenContext(sharePointUrl, accessToken.Token);
 
-                bool result1 = await UpdateSiteCollectionAdministrator(ctx, SCAGroupName, groupId, log);
+                bool result1 = await Common.UpdateSiteCollectionAdministrator(ctx, SCAGroupName, groupId, log);
                 bool result2 = await AddGroupToFullControl(ctx, supportGroupName, log);
                 bool result3 = await AddGroupToReadOnly(ctx, readOnlyGroup, log);
                 bool result4 = await Common.RemoveOwner(graphClient, groupId, ownerId, log);
@@ -60,7 +60,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
                 if (success) {
                     await Common.AddToStatusQueue(itemId, log);
-                    await Common.AddToEmailQueue(requestId, groupId, spaceNameEn, spaceNameFr, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
+                    await Common.AddToEmailQueue(requestId, "unclassified", groupId, spaceNameEn, spaceNameFr, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
                 }
             }
 
@@ -88,50 +88,50 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
         //    return new OkResult();
         //}
 
-        public static Task<bool> UpdateSiteCollectionAdministrator(ClientContext ctx, string GroupLoginName, string groupId, ILogger log) // ClientContext ctx, 
-        {
-            log.LogInformation("UpdateSiteCollectionAdministrator received a request.");
+        //public static Task<bool> UpdateSiteCollectionAdministrator(ClientContext ctx, string GroupLoginName, string groupId, ILogger log) // ClientContext ctx, 
+        //{
+        //    log.LogInformation("UpdateSiteCollectionAdministrator received a request.");
 
-            bool result = true;
+        //    bool result = true;
 
-            try
-            {
-                ctx.Load(ctx.Web);
-                ctx.Load(ctx.Site);
-                ctx.Load(ctx.Site.RootWeb);
-                ctx.Load(ctx.Web.AssociatedOwnerGroup.Users);
-                ctx.ExecuteQuery();
+        //    try
+        //    {
+        //        ctx.Load(ctx.Web);
+        //        ctx.Load(ctx.Site);
+        //        ctx.Load(ctx.Site.RootWeb);
+        //        ctx.Load(ctx.Web.AssociatedOwnerGroup.Users);
+        //        ctx.ExecuteQuery();
 
-                // add dgcx_sca as Administrator
-                List<UserEntity> admins = new List<UserEntity>();
-                UserEntity adminUserEntity = new UserEntity();
-                adminUserEntity.LoginName = GroupLoginName;
-                admins.Add(adminUserEntity);
-                ctx.Site.RootWeb.AddAdministrators(admins, true);
+        //        // add dgcx_sca as Administrator
+        //        List<UserEntity> admins = new List<UserEntity>();
+        //        UserEntity adminUserEntity = new UserEntity();
+        //        adminUserEntity.LoginName = GroupLoginName;
+        //        admins.Add(adminUserEntity);
+        //        ctx.Site.RootWeb.AddAdministrators(admins, true);
 
-                // remove dgcx_sca from the owner group
-                ctx.Web.AssociatedOwnerGroup.Users.RemoveByLoginName(GroupLoginName);
+        //        // remove dgcx_sca from the owner group
+        //        ctx.Web.AssociatedOwnerGroup.Users.RemoveByLoginName(GroupLoginName);
 
-                // remove the owner group
-                string loginName = $"c:0o.c|federateddirectoryclaimprovider|{groupId}_o";
-                log.LogInformation($"Remove loginName = {loginName}");
-                UserEntity ownerGroupEntity = new UserEntity();
-                ownerGroupEntity.LoginName = loginName;
-                ctx.Site.RootWeb.RemoveAdministrator(ownerGroupEntity);
-                log.LogInformation($"Done!");
-            }
-            catch (Exception e)
-            {
-                log.LogError($"Message: {e.Message}");
-                if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
-                log.LogError($"StackTrace: {e.StackTrace}");
-                result = false;
-            }
+        //        // remove the owner group
+        //        string loginName = $"c:0o.c|federateddirectoryclaimprovider|{groupId}_o";
+        //        log.LogInformation($"Remove loginName = {loginName}");
+        //        UserEntity ownerGroupEntity = new UserEntity();
+        //        ownerGroupEntity.LoginName = loginName;
+        //        ctx.Site.RootWeb.RemoveAdministrator(ownerGroupEntity);
+        //        log.LogInformation($"Done!");
+        //    }
+        //    catch (Exception e)
+        //    {
+        //        log.LogError($"Message: {e.Message}");
+        //        if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
+        //        log.LogError($"StackTrace: {e.StackTrace}");
+        //        result = false;
+        //    }
 
-            log.LogInformation("UpdateSiteCollectionAdministrator processed a request.");
+        //    log.LogInformation("UpdateSiteCollectionAdministrator processed a request.");
 
-            return Task.FromResult(result);
-        }
+        //    return Task.FromResult(result);
+        //}
 
         public static Task<bool> AddGroupToFullControl(ClientContext ctx, string GroupLoginName, ILogger log)
         {

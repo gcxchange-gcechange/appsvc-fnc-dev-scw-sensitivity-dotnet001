@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Azure.Core;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -24,8 +25,11 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             string labelId = config["proBLabelId"];
             string ownerId = config["ownerId"]; // sv-caupdate@devgcx.ca
             string requestId = data?.Id;
+            string SCAGroupName = config["sca_prob_login_name"]; // dgcx-sca-prob
+            string sharePointUrl = config["sharePointUrl"] + requestId;
             string spaceNameEn = data?.SpaceName;
             string spaceNameFr = data?.SpaceNameFR;
+            string tenantName = config["tenantName"];
 
             ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);
             var graphClient = new GraphServiceClient(auth);
@@ -34,15 +38,21 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             
             if (result.Result == true)
             {
-                bool result1 = await SetProB(graphClient, groupId, log);
-                bool result2 = await Common.RemoveOwner(graphClient, groupId, ownerId, log);
+                var scopes = new string[] { $"https://{tenantName}.sharepoint.com/.default" };
+                var authManager = new PnP.Framework.AuthenticationManager();
+                var accessToken = await auth.GetTokenAsync(new TokenRequestContext(scopes), new System.Threading.CancellationToken());
+                var ctx = authManager.GetAccessTokenContext(sharePointUrl, accessToken.Token);
 
-                bool success = result1 && result2;
+                bool result1 = await SetProB(graphClient, groupId, log);
+                bool result2 = await Common.UpdateSiteCollectionAdministrator(ctx, SCAGroupName, groupId, log);
+                bool result3 = await Common.RemoveOwner(graphClient, groupId, ownerId, log);
+
+                bool success = result1 && result2 && result3;
 
                 if (success)
                 {
                     await Common.AddToStatusQueue(itemId, log);
-                    await Common.AddToEmailQueue(requestId, groupId, spaceNameEn, spaceNameFr, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
+                    await Common.AddToEmailQueue(requestId, "prob", groupId, spaceNameEn, spaceNameFr, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
                 }
             }
 
