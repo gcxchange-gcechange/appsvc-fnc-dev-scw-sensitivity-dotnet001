@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
+using Microsoft.SharePoint.Client;
 using Microsoft.SharePoint.News.DataModel;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Queue;
@@ -9,6 +10,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using PnP.Framework.Entities;
 
 namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 {
@@ -23,7 +25,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
             log.LogInformation($"ApplyLabel - groupId: {groupId} & labelId: {labelId}");
 
-            var group = new Group
+            var group = new Microsoft.Graph.Group
             {
                 AssignedLabels = new List<AssignedLabel>()
                 {
@@ -43,7 +45,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
                 string status = "Failed";
 
-                var listItem = new ListItem
+                var listItem = new Microsoft.Graph.ListItem
                 {
                     Fields = new FieldValueSet
                     {
@@ -62,7 +64,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 };
                 await AddQueueMessage("email", JsonConvert.SerializeObject(listItem.Fields.AdditionalData), log);
 
-                listItem = new ListItem
+                listItem = new Microsoft.Graph.ListItem
                 {
                     Fields = new FieldValueSet
                     {
@@ -81,13 +83,13 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             return true;
         }
 
-        public static async Task<IActionResult> AddToEmailQueue(string requestId, string groupId, string spaceNameEn, string spaceNameFr, string requesterName, string requesterEmail, ILogger log)
+        public static async Task<IActionResult> AddToEmailQueue(string requestId, string securityCategory, string groupId, string spaceNameEn, string spaceNameFr, string requesterName, string requesterEmail, ILogger log)
         {
             log.LogInformation("AddToEmailQueue received a request.");
 
             try
             {
-                var listItem = new ListItem
+                var listItem = new Microsoft.Graph.ListItem
                 {
                     Fields = new FieldValueSet
                     {
@@ -100,7 +102,8 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                             { "RequesterName", requesterName },
                             { "RequesterEmail", requesterEmail },
                             { "Status", "Team Created" },
-                            { "Comment", "" }
+                            { "Comment", "" },
+                            { "SecurityCategory", securityCategory }
                         }
                     }
                 };
@@ -118,6 +121,57 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
             return new OkResult();
         }
+
+
+        public static Task<bool> UpdateSiteCollectionAdministrator(ClientContext ctx, string GroupLoginName, string groupId, ILogger log) // ClientContext ctx, 
+        {
+            log.LogInformation("UpdateSiteCollectionAdministrator received a request.");
+
+            bool result = true;
+
+            try
+            {
+                ctx.Load(ctx.Web);
+                ctx.Load(ctx.Site);
+                ctx.Load(ctx.Site.RootWeb);
+                ctx.Load(ctx.Web.AssociatedOwnerGroup.Users);
+                ctx.ExecuteQuery();
+
+                // add dgcx_sca as Administrator
+                List<UserEntity> admins = new List<UserEntity>();
+                UserEntity adminUserEntity = new UserEntity();
+                adminUserEntity.LoginName = GroupLoginName;
+                admins.Add(adminUserEntity);
+
+                log.LogInformation($"Add loginName = {GroupLoginName}");
+                ctx.Site.RootWeb.AddAdministrators(admins, true);
+                log.LogInformation($"Done!");
+
+                // remove dgcx_sca from the owner group
+                ctx.Web.AssociatedOwnerGroup.Users.RemoveByLoginName(GroupLoginName);
+
+                // remove the owner group
+                string loginName = $"c:0o.c|federateddirectoryclaimprovider|{groupId}_o";
+                UserEntity ownerGroupEntity = new UserEntity();
+                ownerGroupEntity.LoginName = loginName;
+
+                log.LogInformation($"Remove loginName = {loginName}");
+                ctx.Site.RootWeb.RemoveAdministrator(ownerGroupEntity);
+                log.LogInformation($"Done!");
+            }
+            catch (Exception e)
+            {
+                log.LogError($"Message: {e.Message}");
+                if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
+                log.LogError($"StackTrace: {e.StackTrace}");
+                result = false;
+            }
+
+            log.LogInformation("UpdateSiteCollectionAdministrator processed a request.");
+
+            return Task.FromResult(result);
+        }
+
 
         public static async Task<bool> RemoveOwner(GraphServiceClient graphClient, string groupId, string userId, ILogger log)
         {
@@ -166,7 +220,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
             try
             {
-                var listItem = new ListItem
+                var listItem = new Microsoft.Graph.ListItem
                 {
                     Fields = new FieldValueSet
                     {
