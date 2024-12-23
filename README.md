@@ -45,7 +45,8 @@ Sharepoint
 | ownerId				           | Id of  the service account to add as temporary owner in order to authorize delegated permissions |
 | proBLabelId              | Id of the "Protected B sensitivity" label                                                        |
 | readOnlyGroup            | Login name of groups that are provided read-only access                                          |
-| sca_login_name           | Login name of the group for site collection administrator access                                 |
+| sca_login_name           | Login name of the group for site collection administrator access for unclassified sites          |
+| sca_prob_login_name      | Login name of the group for site collection administrator access for protected sites             |
 | secretName               | Secret name used to authorize the function app                                					          |
 | secretNamePassword       | The secret name for the delegated user (user_name) password                                      |
 | sharePointUrl			       | The base url under which new sites will be created 	    						                            |
