@@ -5,6 +5,7 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
+using Microsoft.SharePoint.Client;
 using Newtonsoft.Json;
 
 namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
@@ -43,7 +44,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 var accessToken = await auth.GetTokenAsync(new TokenRequestContext(scopes), new System.Threading.CancellationToken());
                 var ctx = authManager.GetAccessTokenContext(sharePointUrl, accessToken.Token);
 
-                bool result1 = await SetProB(graphClient, groupId, log);
+                bool result1 = await SetProB(graphClient, groupId, ctx, log);
                 bool result2 = await Common.UpdateSiteCollectionAdministrator(ctx, SCAGroupName, groupId, log);
                 bool result3 = await Common.RemoveOwner(graphClient, groupId, ownerId, log);
 
@@ -59,7 +60,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             log.LogInformation($"ApplyProBSettings processed a request.");
         }
 
-        private static Task<bool> SetProB(GraphServiceClient graphClient, string groupId, ILogger log)
+        private static Task<bool> SetProB(GraphServiceClient graphClient, string groupId, ClientContext ctx, ILogger log)
         {
             log.LogInformation("SetProB received a request.");
 
@@ -67,6 +68,21 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
             try
             {
+                // remove the visitor's group
+                var avg = ctx.Web.AssociatedVisitorGroup;
+                ctx.Load(avg, w => w.Title);
+                ctx.ExecuteQuery();
+
+                if (avg != null) {
+                    log.LogInformation($"Removing group: {avg.Title}");
+                    ctx.Web.RemoveGroup(avg);
+                }
+
+                // this prevents the Hub Visitor group from being added to site permissions
+                ctx.Load(ctx.Site);
+                ctx.Site.CanSyncHubSitePermissions = false;
+
+                // set group visibility to private
                 var group = new Microsoft.Graph.Group { Visibility = "Private" };
                 graphClient.Groups[groupId].Request().UpdateAsync(group);
             }
