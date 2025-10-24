@@ -1,15 +1,10 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Azure.Storage.Queues;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using Microsoft.SharePoint.Client;
-using Microsoft.SharePoint.News.DataModel;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Queue;
 using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using PnP.Framework.Entities;
 
 namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
@@ -18,11 +13,6 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
     {
         public static async Task<Boolean> ApplyLabel(GraphServiceClient graphClient, string labelId, string groupId, string itemId, string requestId, string spaceNameEn, string spaceNameFr, ILogger log)
         {
-            // Digital Vault - Vault Digitale Digital Vault                3d277510-cb23-44c1-a9c4-7680fcc237fb
-            // PROTECTED B - PROTÉGÉ B        Protect B                    a1ab9d1a-185f-40cc-97d9-e1177019a70b
-            // UNCLASSIFIED - NON CLASSIFIÉ   UNCLASSIFIED - NON CLASSIFIÉ d64b0091-505a-4a12-b8e5-9f04b9078a83
-            // Protected B MCAS               Protected B - MCAS           e12d86d7-fccd-49e3-8025-027a3c2cbf3a
-
             log.LogInformation($"ApplyLabel - groupId: {groupId} & labelId: {labelId}");
 
             var group = new Microsoft.Graph.Group
@@ -204,12 +194,10 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
             string connectionString = config["AzureWebJobsStorage"];
 
-            CloudStorageAccount storageAccount = CloudStorageAccount.Parse(connectionString);
-            CloudQueueClient queueClient = storageAccount.CreateCloudQueueClient();
-            CloudQueue queue = queueClient.GetQueueReference(queueName);
+            QueueClientOptions options = new QueueClientOptions() { MessageEncoding = QueueMessageEncoding.Base64 };
+            QueueClient client = new QueueClient(connectionString, queueName, options);
 
-            CloudQueueMessage message = new CloudQueueMessage(serializedMessage);
-            await queue.AddMessageAsync(message);
+            await client.SendMessageAsync(serializedMessage);
 
             log.LogInformation("AddQueueMessage processed a request.");
         }
