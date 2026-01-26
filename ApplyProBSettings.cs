@@ -1,21 +1,25 @@
-using System;
-using System.Threading.Tasks;
 using Azure.Core;
-using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using Microsoft.SharePoint.Client;
 using Newtonsoft.Json;
+using Microsoft.Azure.Functions.Worker;
 
 namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 {
     public class ApplyProBSettings
     {
-        [FunctionName("ApplyProBSettings")]
-        public async Task RunAsync([QueueTrigger("prob", Connection = "AzureWebJobsStorage")] string myQueueItem, ILogger log)
+        private readonly ILogger<ApplyProBSettings> _logger;
+        public ApplyProBSettings(ILogger<ApplyProBSettings> logger)
         {
-            log.LogInformation($"ApplyProBSettings received a request: {myQueueItem}");
+            _logger = logger;
+        }
+
+        [Function("ApplyProBSettings")]
+        public async Task RunAsync([QueueTrigger("prob", Connection = "AzureWebJobsStorage")] string myQueueItem)
+        {
+            _logger.LogInformation($"ApplyProBSettings received a request: {myQueueItem}");
 
             dynamic data = JsonConvert.DeserializeObject(myQueueItem);
 
@@ -32,10 +36,10 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             string spaceNameFr = data?.SpaceNameFR;
             string tenantName = config["tenantName"];
 
-            ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);
+            ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(_logger);
             var graphClient = new GraphServiceClient(auth);
 
-            var result = Common.ApplyLabel(graphClient, labelId, groupId, itemId, requestId, spaceNameEn, spaceNameFr, log);
+            var result = Common.ApplyLabel(graphClient, labelId, groupId, itemId, requestId, spaceNameEn, spaceNameFr, _logger);
             
             if (result.Result == true)
             {
@@ -44,20 +48,20 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 var accessToken = await auth.GetTokenAsync(new TokenRequestContext(scopes), new System.Threading.CancellationToken());
                 var ctx = authManager.GetAccessTokenContext(sharePointUrl, accessToken.Token);
 
-                bool result1 = await SetProB(graphClient, groupId, ctx, log);
-                bool result2 = await Common.UpdateSiteCollectionAdministrator(ctx, SCAGroupName, groupId, log);
-                bool result3 = await Common.RemoveOwner(graphClient, groupId, ownerId, log);
+                bool result1 = await SetProB(graphClient, groupId, ctx, _logger);
+                bool result2 = await Common.UpdateSiteCollectionAdministrator(ctx, SCAGroupName, groupId, _logger);
+                bool result3 = await Common.RemoveOwner(graphClient, groupId, ownerId, _logger);
 
                 bool success = result1 && result2 && result3;
 
                 if (success)
                 {
-                    await Common.AddToStatusQueue(itemId, log);
-                    await Common.AddToEmailQueue(requestId, "prob", groupId, spaceNameEn, spaceNameFr, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
+                    await Common.AddToStatusQueue(itemId, _logger);
+                    await Common.AddToEmailQueue(requestId, "prob", groupId, spaceNameEn, spaceNameFr, (string)data?.RequesterName, (string)data?.RequesterEmail, _logger);
                 }
             }
 
-            log.LogInformation($"ApplyProBSettings processed a request.");
+            _logger.LogInformation($"ApplyProBSettings processed a request.");
         }
 
         private static Task<bool> SetProB(GraphServiceClient graphClient, string groupId, ClientContext ctx, ILogger log)

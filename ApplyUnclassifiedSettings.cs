@@ -1,23 +1,25 @@
-using System;
-using System.Threading.Tasks;
-using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using Newtonsoft.Json;
-using System.Collections.Generic;
 using Microsoft.SharePoint.Client;
-using PnP.Framework.Entities;
 using Azure.Core;
+using Microsoft.Azure.Functions.Worker;
 
 namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 {
     public class ApplyUnclassifiedSettings
     {
-        [FunctionName("ApplyUnclassifiedSettings")]
-        public async Task RunAsync([QueueTrigger("unclassified", Connection = "AzureWebJobsStorage")] string myQueueItem, ILogger log, ExecutionContext functionContext)
+        private readonly ILogger<ApplyUnclassifiedSettings> _logger;
+        public ApplyUnclassifiedSettings(ILogger<ApplyUnclassifiedSettings> logger)
         {
-            log.LogInformation($"ApplyUnclassifiedSettings received a request: {myQueueItem}");
+            _logger = logger;
+        }
+
+        [Function("ApplyUnclassifiedSettings")]
+        public async Task RunAsync([QueueTrigger("unclassified", Connection = "AzureWebJobsStorage")] string myQueueItem, ExecutionContext functionContext)
+        {
+            _logger.LogInformation($"ApplyUnclassifiedSettings received a request: {myQueueItem}");
 
             dynamic data = JsonConvert.DeserializeObject(myQueueItem);
 
@@ -36,10 +38,10 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
             string supportGroupName = config["support_group_login_name"];   // dgcx_support
             string tenantName = config["tenantName"];
 
-            ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(log);
+            ROPCConfidentialTokenCredential auth = new ROPCConfidentialTokenCredential(_logger);
             var graphClient = new GraphServiceClient(auth);
 
-            var result = Common.ApplyLabel(graphClient, labelId, groupId, itemId, requestId, spaceNameEn, spaceNameFr, log);
+            var result = Common.ApplyLabel(graphClient, labelId, groupId, itemId, requestId, spaceNameEn, spaceNameFr, _logger);
 
             if (result.Result == true)
             {
@@ -51,87 +53,21 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 var accessToken = await auth.GetTokenAsync(new TokenRequestContext(scopes), new System.Threading.CancellationToken());
                 var ctx = authManager.GetAccessTokenContext(sharePointUrl, accessToken.Token);
 
-                bool result1 = await Common.UpdateSiteCollectionAdministrator(ctx, SCAGroupName, groupId, log);
-                bool result2 = await AddGroupToFullControl(ctx, supportGroupName, log);
-                bool result3 = await AddGroupToReadOnly(ctx, readOnlyGroup, log);
-                bool result4 = await Common.RemoveOwner(graphClient, groupId, ownerId, log);
+                bool result1 = await Common.UpdateSiteCollectionAdministrator(ctx, SCAGroupName, groupId, _logger);
+                bool result2 = await AddGroupToFullControl(ctx, supportGroupName, _logger);
+                bool result3 = await AddGroupToReadOnly(ctx, readOnlyGroup, _logger);
+                bool result4 = await Common.RemoveOwner(graphClient, groupId, ownerId, _logger);
 
                 bool success = result1 && result2 && result3 && result4;
 
                 if (success) {
-                    await Common.AddToStatusQueue(itemId, log);
-                    await Common.AddToEmailQueue(requestId, "unclassified", groupId, spaceNameEn, spaceNameFr, (string)data?.RequesterName, (string)data?.RequesterEmail, log);
+                    await Common.AddToStatusQueue(itemId, _logger);
+                    await Common.AddToEmailQueue(requestId, "unclassified", groupId, spaceNameEn, spaceNameFr, (string)data?.RequesterName, (string)data?.RequesterEmail, _logger);
                 }
             }
 
-            log.LogInformation($"ApplyUnclassifiedSettings processed a request.");
+            _logger.LogInformation($"ApplyUnclassifiedSettings processed a request.");
         }
-
-        //private static async Task<IActionResult> SetUnclassified(GraphServiceClient graphClient, string groupId, ILogger log)
-        //{
-        //    log.LogInformation("SetUnclassified received a request.");
-
-        //    try
-        //    {
-        //        var group = new Microsoft.Graph.Group { Visibility = "Public" };
-        //        await graphClient.Groups[groupId].Request().UpdateAsync(group);
-        //    }
-        //    catch (Exception e)
-        //    {
-        //        log.LogError($"Message: {e.Message}");
-        //        if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
-        //        log.LogError($"StackTrace: {e.StackTrace}");
-        //    }
-
-        //    log.LogInformation("SetUnclassified processed a request.");
-
-        //    return new OkResult();
-        //}
-
-        //public static Task<bool> UpdateSiteCollectionAdministrator(ClientContext ctx, string GroupLoginName, string groupId, ILogger log) // ClientContext ctx, 
-        //{
-        //    log.LogInformation("UpdateSiteCollectionAdministrator received a request.");
-
-        //    bool result = true;
-
-        //    try
-        //    {
-        //        ctx.Load(ctx.Web);
-        //        ctx.Load(ctx.Site);
-        //        ctx.Load(ctx.Site.RootWeb);
-        //        ctx.Load(ctx.Web.AssociatedOwnerGroup.Users);
-        //        ctx.ExecuteQuery();
-
-        //        // add dgcx_sca as Administrator
-        //        List<UserEntity> admins = new List<UserEntity>();
-        //        UserEntity adminUserEntity = new UserEntity();
-        //        adminUserEntity.LoginName = GroupLoginName;
-        //        admins.Add(adminUserEntity);
-        //        ctx.Site.RootWeb.AddAdministrators(admins, true);
-
-        //        // remove dgcx_sca from the owner group
-        //        ctx.Web.AssociatedOwnerGroup.Users.RemoveByLoginName(GroupLoginName);
-
-        //        // remove the owner group
-        //        string loginName = $"c:0o.c|federateddirectoryclaimprovider|{groupId}_o";
-        //        log.LogInformation($"Remove loginName = {loginName}");
-        //        UserEntity ownerGroupEntity = new UserEntity();
-        //        ownerGroupEntity.LoginName = loginName;
-        //        ctx.Site.RootWeb.RemoveAdministrator(ownerGroupEntity);
-        //        log.LogInformation($"Done!");
-        //    }
-        //    catch (Exception e)
-        //    {
-        //        log.LogError($"Message: {e.Message}");
-        //        if (e.InnerException is not null) log.LogError($"InnerException: {e.InnerException.Message}");
-        //        log.LogError($"StackTrace: {e.StackTrace}");
-        //        result = false;
-        //    }
-
-        //    log.LogInformation("UpdateSiteCollectionAdministrator processed a request.");
-
-        //    return Task.FromResult(result);
-        //}
 
         public static Task<bool> AddGroupToFullControl(ClientContext ctx, string GroupLoginName, ILogger log)
         {
