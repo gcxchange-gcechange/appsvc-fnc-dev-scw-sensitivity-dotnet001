@@ -1,18 +1,9 @@
 ﻿using Azure.Core;
 using Azure.Identity;
 using Azure.Security.KeyVault.Secrets;
-using Microsoft.Azure.KeyVault;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Microsoft.SharePoint.Client;
 using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Net.Http;
-using System.Security.Cryptography.X509Certificates;
-using System.Threading;
-using System.Threading.Tasks;
-using PnP.Framework;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 namespace appsvc_fnc_dev_scw_sensitivity_dotnet001

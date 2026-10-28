@@ -87,8 +87,8 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 ctx.Site.CanSyncHubSitePermissions = false;
 
                 // set group visibility to private
-                var group = new Microsoft.Graph.Group { Visibility = "Private" };
-                graphClient.Groups[groupId].Request().UpdateAsync(group);
+                var group = new Microsoft.Graph.Models.Group { Visibility = "Private" };
+                graphClient.Groups[groupId].PatchAsync(group);
             }
             catch (Exception e)
             {
