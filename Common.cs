@@ -6,6 +6,7 @@ using Microsoft.Graph;
 using Microsoft.SharePoint.Client;
 using Newtonsoft.Json;
 using PnP.Framework.Entities;
+using Microsoft.Graph.Models;
 
 namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 {
@@ -15,7 +16,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
         {
             log.LogInformation($"ApplyLabel - groupId: {groupId} & labelId: {labelId}");
 
-            var group = new Microsoft.Graph.Group
+            var group = new Microsoft.Graph.Models.Group
             {
                 AssignedLabels = new List<AssignedLabel>()
                 {
@@ -25,7 +26,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
             try
             {
-                var users = await graphClient.Groups[groupId].Request().UpdateAsync(group);
+                var users = await graphClient.Groups[groupId].PatchAsync(group);
             }
             catch (Exception e)
             {
@@ -35,7 +36,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
                 string status = "Failed";
 
-                var listItem = new Microsoft.Graph.ListItem
+                var listItem = new Microsoft.Graph.Models.ListItem
                 {
                     Fields = new FieldValueSet
                     {
@@ -54,7 +55,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
                 };
                 await AddQueueMessage("email", JsonConvert.SerializeObject(listItem.Fields.AdditionalData), log);
 
-                listItem = new Microsoft.Graph.ListItem
+                listItem = new Microsoft.Graph.Models.ListItem
                 {
                     Fields = new FieldValueSet
                     {
@@ -79,7 +80,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
             try
             {
-                var listItem = new Microsoft.Graph.ListItem
+                var listItem = new Microsoft.Graph.Models.ListItem
                 {
                     Fields = new FieldValueSet
                     {
@@ -171,7 +172,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
             try
             {
-                await graphClient.Groups[groupId].Owners[userId].Reference.Request().DeleteAsync();
+                await graphClient.Groups[groupId].Owners[userId].Ref.DeleteAsync();
             }
             catch (Exception e)
             {
@@ -208,7 +209,7 @@ namespace appsvc_fnc_dev_scw_sensitivity_dotnet001
 
             try
             {
-                var listItem = new Microsoft.Graph.ListItem
+                var listItem = new Microsoft.Graph.Models.ListItem
                 {
                     Fields = new FieldValueSet
                     {
